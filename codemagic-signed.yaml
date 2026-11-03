@@ -1,0 +1,274 @@
+# AllinView — SIGNED Codemagic config (PREPARED ONLY — DO NOT RUN YET).
+# This file is NOT in the repo yet and has NOT been uploaded to TestFlight.
+# It was prepared Nov 3, 2026 at Clare's request ("start with the Apple key
+# and signed build"). Running the signed workflow is a SEPARATE approval.
+#
+# How this file relates to the other configs:
+# - ~/workspace/your_files/codemagic.yaml (and the repo's codemagic.yaml) is
+#   the UNSIGNED free-tier test workflow that already passed on Nov 3, 2026
+#   (1m 18s, Mac mini M2). That workflow is kept UNCHANGED below as
+#   ios-free-tier-test, so the proven test path still exists.
+# - ios-signed-testflight (new, second workflow) is the SIGNED path. It
+#   reuses the exact same folder-reconstruction first step, then signs the
+#   app with Clare's App Store Connect API key and publishes to TestFlight.
+#   It does NOT submit to the App Store (submit_to_app_store: false).
+#
+# BEFORE RUNNING ios-signed-testflight, Clare must have done ALL of these
+# (none of these values ever go in this yaml or in chat):
+#  1. The .p8 file, Key ID, and Issuer ID for the "AllinView Build" App
+#     Store Connect API key (App Manager role) are saved somewhere safe.
+#  2. In Codemagic: Team settings > Integrations > Developer Portal, an
+#     integration named EXACTLY "AllinView Build" is created with that .p8,
+#     Key ID, and Issuer ID. The yaml references that name only.
+#  3. An Apple Distribution certificate exists for the team. The workflow
+#     fetches signing files with --create, but it deliberately does NOT
+#     pass --certificate-key, because no CERTIFICATE_PRIVATE_KEY exists yet.
+#     If the fetch step fails with no certificate, generate an Apple
+#     Distribution certificate first in Codemagic Team settings > Code
+#     signing identities (using the AllinView Build key), then re-run.
+#     Do NOT invent or paste a private key into this file.
+#
+# KNOWN GAPS — read before running (these are real, not boilerplate):
+#  (a) AllinViewStoreKit.swift is on disk at ios/App/App/ but is NOT
+#      referenced anywhere in ios/App/App.xcodeproj/project.pbxproj
+#      (verified Nov 3, 2026: no PBXBuildFile / PBXFileReference entry).
+#      The signed build may still SUCCEED without it, but StoreKit purchases
+#      will NOT work at runtime until the file is added to the App target.
+#      Fix on a Mac in Xcode (open the workspace, add the file to the App
+#      target, confirm it compiles) — do NOT hand-edit project.pbxproj blind.
+#      The workflow prints a loud WARNING about this but does not fail on
+#      it, so the first signed run is a build-path test only, NOT a
+#      purchase-ready TestFlight build.
+#  (b) In-App Purchase capability must be enabled for the App ID
+#      com.allinview.app (Apple Developer portal > Identifiers, and in the
+#      Xcode project). If the provisioning profile is created before the
+#      capability is enabled, the profile will not include it and StoreKit
+#      will fail at runtime. Enable the capability BEFORE the first signed
+#      run, or regenerate the profile after enabling it.
+#  (c) The .p8 file, Key ID, and Issuer ID must be entered by Clare in
+#      Codemagic Team > Integrations > Developer Portal — never in chat,
+#      never in this yaml, never in the repo.
+#  (d) Repo hygiene (unrelated to signing, still open): the GitHub repo was
+#      Public in Clare's Nov 3 screenshots and still contains the uploaded
+#      "AllinView source zip.zip" and stray "download" files. Clean those up
+#      separately; this yaml ignores them and never deletes them.
+#
+# Cost guardrails (same as the unsigned workflow):
+# - Free tier only (500 macOS M2 minutes/month). Stop before the free
+#   allowance runs out. NEVER enable pay-as-you-go or add a card without
+#   Clare's explicit yes.
+# - This file does NOT submit to the App Store. TestFlight upload happens
+#   only when Clare separately approves RUNNING ios-signed-testflight.
+#
+workflows:
+  ios-free-tier-test:
+    name: AllinView iOS (free tier, unsigned test build)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    environment:
+      vars:
+        XCODE_VERSION: "26.0"
+      # NOTE: node/npm are installed in the build step below; do not cache credentials.
+    scripts:
+      - name: Rebuild folder structure from flat repo (no-op if already structured)
+        script: |
+          set -e
+          # Move a flat file into place only if the flat file exists AND the
+          # target does not already exist. Never overwrites, never fails on
+          # a missing flat file.
+          move_flat() {
+            if [ -f "$1" ] && [ ! -f "$2" ]; then
+              mkdir -p "$(dirname "$2")"
+              mv "$1" "$2"
+            fi
+          }
+          # Web sources -> src/
+          move_flat App.tsx src/App.tsx
+          move_flat App.css src/App.css
+          move_flat main.tsx src/main.tsx
+          # Web sources -> src/lib/
+          move_flat types.ts src/lib/types.ts
+          move_flat store.ts src/lib/store.ts
+          move_flat payoff.ts src/lib/payoff.ts
+          move_flat storekit.ts src/lib/storekit.ts
+          move_flat native.ts src/lib/native.ts
+          # Swift sources -> ios/App/App/
+          move_flat AllinViewStoreKit.swift ios/App/App/AllinViewStoreKit.swift
+          move_flat AppDelegate.swift ios/App/App/AppDelegate.swift
+          move_flat Info.plist ios/App/App/Info.plist
+          # Storyboards -> ios/App/App/Base.lproj/
+          move_flat LaunchScreen.storyboard ios/App/App/Base.lproj/LaunchScreen.storyboard
+          move_flat Main.storyboard ios/App/App/Base.lproj/Main.storyboard
+          # Xcode project files
+          move_flat project.pbxproj ios/App/App.xcodeproj/project.pbxproj
+          move_flat IDEWorkspaceChecks.plist ios/App/App.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+          move_flat Podfile ios/App/Podfile
+          # Assets: splash images -> Splash.imageset/, app icon -> AppIcon.appiconset/
+          move_flat splash-2732x2732.png ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png
+          move_flat splash-2732x2732-1.png ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png
+          move_flat splash-2732x2732-2.png ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png
+          move_flat AppIcon-512@2x.png ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+          # Contents.json files: the flat copies are AMBIGUOUS (Windows renamed
+          # the three originals to Contents.json, "Contents (1).json" and
+          # "Contents (2).json"), so they are NEVER moved or guessed. Instead
+          # write the exact original Contents.json content (base64, decoded
+          # here) into each of the three correct locations. Identical to the
+          # originals in the standalone rebuild; overwriting a correct copy
+          # with the same bytes is harmless.
+          mkdir -p ios/App/App/Assets.xcassets ios/App/App/Assets.xcassets/AppIcon.appiconset ios/App/App/Assets.xcassets/Splash.imageset
+          echo 'ewogICJpbmZvIiA6IHsKICAgICJ2ZXJzaW9uIiA6IDEsCiAgICAiYXV0aG9yIiA6ICJ4Y29kZSIKICB9Cn0=' | base64 -d > ios/App/App/Assets.xcassets/Contents.json
+          echo 'ewogICJpbWFnZXMiIDogWwogICAgewogICAgICAiZmlsZW5hbWUiIDogIkFwcEljb24tNTEyQDJ4LnBuZyIsCiAgICAgICJpZGlvbSIgOiAidW5pdmVyc2FsIiwKICAgICAgInBsYXRmb3JtIiA6ICJpb3MiLAogICAgICAic2l6ZSIgOiAiMTAyNHgxMDI0IgogICAgfQogIF0sCiAgImluZm8iIDogewogICAgImF1dGhvciIgOiAieGNvZGUiLAogICAgInZlcnNpb24iIDogMQogIH0KfQo=' | base64 -d > ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json
+          echo 'ewogICJpbWFnZXMiIDogWwogICAgewogICAgICAiaWRpb20iIDogInVuaXZlcnNhbCIsCiAgICAgICJmaWxlbmFtZSIgOiAic3BsYXNoLTI3MzJ4MjczMi0yLnBuZyIsCiAgICAgICJzY2FsZSIgOiAiMXgiCiAgICB9LAogICAgewogICAgICAiaWRpb20iIDogInVuaXZlcnNhbCIsCiAgICAgICJmaWxlbmFtZSIgOiAic3BsYXNoLTI3MzJ4MjczMi0xLnBuZyIsCiAgICAgICJzY2FsZSIgOiAiMngiCiAgICB9LAogICAgewogICAgICAiaWRpb20iIDogInVuaXZlcnNhbCIsCiAgICAgICJmaWxlbmFtZSIgOiAic3BsYXNoLTI3MzJ4MjczMi5wbmciLAogICAgICAic2NhbGUiIDogIjN4IgogICAgfQogIF0sCiAgImluZm8iIDogewogICAgInZlcnNpb24iIDogMSwKICAgICJhdXRob3IiIDogInhjb2RlIgogIH0KfQ==' | base64 -d > ios/App/App/Assets.xcassets/Splash.imageset/Contents.json
+          # ios/.gitignore: write the exact original only if it is missing.
+          # The flat repo may hold a root .gitignore, an ios one, or neither
+          # under a renamed name; writing the known-good content when absent
+          # is safe and never overwrites an existing file.
+          if [ ! -f ios/.gitignore ]; then
+            echo 'QXBwL2J1aWxkCkFwcC9Qb2RzCkFwcC9vdXRwdXQKQXBwL0FwcC9wdWJsaWMKRGVyaXZlZERhdGEKeGN1c2VyZGF0YQoKIyBDb3Jkb3ZhIHBsdWdpbnMgZm9yIENhcGFjaXRvcgpjYXBhY2l0b3ItY29yZG92YS1pb3MtcGx1Z2lucwoKIyBHZW5lcmF0ZWQgQ29uZmlnIGZpbGVzCkFwcC9BcHAvY2FwYWNpdG9yLmNvbmZpZy5qc29uCkFwcC9BcHAvY29uZmlnLnhtbAo=' | base64 -d > ios/.gitignore
+          fi
+          # Remove only the ambiguous flat Contents.json copies at the root
+          # (now superseded by the correct files written above). Harmless
+          # no-op when they do not exist.
+          rm -f Contents.json 'Contents (1).json' 'Contents (2).json'
+          # Report what the tree now looks like, for the build log.
+          echo '--- reconstructed tree (key files) ---'
+          ls src src/lib ios/App/App ios/App/App.xcodeproj ios/App/App.xcworkspace/xcshareddata ios/App 2>&1 || true
+      - name: Install dependencies
+        script: |
+          npm ci
+      - name: Build web bundle and sync iOS project
+        script: |
+          npm run build
+          npx cap sync ios
+      - name: Verify native layers are present (no signing, no upload)
+        script: |
+          test -f ios/App/App/AllinViewStoreKit.swift
+          test -d ios/App/App.xcworkspace
+          grep -q "com.allinview.app" capacitor.config.ts
+          grep -q "11.99" src/lib/storekit.ts
+          ! grep -Eq "11[.]88" src/lib/storekit.ts src/App.tsx || (echo "FORBIDDEN PRICE FOUND" && exit 1)
+
+  ios-signed-testflight:
+    name: AllinView iOS (signed, TestFlight)
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    # VERIFIED (Codemagic docs/examples): the integration name here must
+    # match EXACTLY the name Clare gives the key in Codemagic Team settings
+    # > Integrations > Developer Portal. No key material is in this file.
+    integrations:
+      app_store_connect: 'AllinView Build'
+    environment:
+      vars:
+        XCODE_VERSION: "26.0"
+        BUNDLE_ID: "com.allinview.app"
+        XCODE_WORKSPACE: "ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+    scripts:
+      - name: Rebuild folder structure from flat repo (signed workflow)
+        script: |
+          set -e
+          # Move a flat file into place only if the flat file exists AND the
+          # target does not already exist. Never overwrites, never fails on
+          # a missing flat file.
+          move_flat() {
+            if [ -f "$1" ] && [ ! -f "$2" ]; then
+              mkdir -p "$(dirname "$2")"
+              mv "$1" "$2"
+            fi
+          }
+          # Web sources -> src/
+          move_flat App.tsx src/App.tsx
+          move_flat App.css src/App.css
+          move_flat main.tsx src/main.tsx
+          # Web sources -> src/lib/
+          move_flat types.ts src/lib/types.ts
+          move_flat store.ts src/lib/store.ts
+          move_flat payoff.ts src/lib/payoff.ts
+          move_flat storekit.ts src/lib/storekit.ts
+          move_flat native.ts src/lib/native.ts
+          # Swift sources -> ios/App/App/
+          move_flat AllinViewStoreKit.swift ios/App/App/AllinViewStoreKit.swift
+          move_flat AppDelegate.swift ios/App/App/AppDelegate.swift
+          move_flat Info.plist ios/App/App/Info.plist
+          # Storyboards -> ios/App/App/Base.lproj/
+          move_flat LaunchScreen.storyboard ios/App/App/Base.lproj/LaunchScreen.storyboard
+          move_flat Main.storyboard ios/App/App/Base.lproj/Main.storyboard
+          # Xcode project files
+          move_flat project.pbxproj ios/App/App.xcodeproj/project.pbxproj
+          move_flat IDEWorkspaceChecks.plist ios/App/App.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist
+          move_flat Podfile ios/App/Podfile
+          # Assets: splash images -> Splash.imageset/, app icon -> AppIcon.appiconset/
+          move_flat splash-2732x2732.png ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png
+          move_flat splash-2732x2732-1.png ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png
+          move_flat splash-2732x2732-2.png ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png
+          move_flat AppIcon-512@2x.png ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png
+          # Contents.json files: the flat copies are AMBIGUOUS (Windows renamed
+          # the three originals to Contents.json, "Contents (1).json" and
+          # "Contents (2).json"), so they are NEVER moved or guessed. Instead
+          # write the exact original Contents.json content (base64, decoded
+          # here) into each of the three correct locations. Identical to the
+          # originals in the standalone rebuild; overwriting a correct copy
+          # with the same bytes is harmless.
+          mkdir -p ios/App/App/Assets.xcassets ios/App/App/Assets.xcassets/AppIcon.appiconset ios/App/App/Assets.xcassets/Splash.imageset
+          echo 'ewogICJpbmZvIiA6IHsKICAgICJ2ZXJzaW9uIiA6IDEsCiAgICAiYXV0aG9yIiA6ICJ4Y29kZSIKICB9Cn0=' | base64 -d > ios/App/App/Assets.xcassets/Contents.json
+          echo 'ewogICJpbWFnZXMiIDogWwogICAgewogICAgICAiZmlsZW5hbWUiIDogIkFwcEljb24tNTEyQDJ4LnBuZyIsCiAgICAgICJpZGlvbSIgOiAidW5pdmVyc2FsIiwKICAgICAgInBsYXRmb3JtIiA6ICJpb3MiLAogICAgICAic2l6ZSIgOiAiMTAyNHgxMDI0IgogICAgfQogIF0sCiAgImluZm8iIDogewogICAgImF1dGhvciIgOiAieGNvZGUiLAogICAgInZlcnNpb24iIDogMQogIH0KfQo=' | base64 -d > ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json
+          echo 'ewogICJpbWFnZXMiIDogWwogICAgewogICAgICAiaWRpb20iIDogInVuaXZlcnNhbCIsCiAgICAgICJmaWxlbmFtZSIgOiAic3BsYXNoLTI3MzJ4MjczMi0yLnBuZyIsCiAgICAgICJzY2FsZSIgOiAiMXgiCiAgICB9LAogICAgewogICAgICAiaWRpb20iIDogInVuaXZlcnNhbCIsCiAgICAgICJmaWxlbmFtZSIgOiAic3BsYXNoLTI3MzJ4MjczMi0xLnBuZyIsCiAgICAgICJzY2FsZSIgOiAiMngiCiAgICB9LAogICAgewogICAgICAiaWRpb20iIDogInVuaXZlcnNhbCIsCiAgICAgICJmaWxlbmFtZSIgOiAic3BsYXNoLTI3MzJ4MjczMi5wbmciLAogICAgICAic2NhbGUiIDogIjN4IgogICAgfQogIF0sCiAgImluZm8iIDogewogICAgInZlcnNpb24iIDogMSwKICAgICJhdXRob3IiIDogInhjb2RlIgogIH0KfQ==' | base64 -d > ios/App/App/Assets.xcassets/Splash.imageset/Contents.json
+          # ios/.gitignore: write the exact original only if it is missing.
+          # The flat repo may hold a root .gitignore, an ios one, or neither
+          # under a renamed name; writing the known-good content when absent
+          # is safe and never overwrites an existing file.
+          if [ ! -f ios/.gitignore ]; then
+            echo 'QXBwL2J1aWxkCkFwcC9Qb2RzCkFwcC9vdXRwdXQKQXBwL0FwcC9wdWJsaWMKRGVyaXZlZERhdGEKeGN1c2VyZGF0YQoKIyBDb3Jkb3ZhIHBsdWdpbnMgZm9yIENhcGFjaXRvcgpjYXBhY2l0b3ItY29yZG92YS1pb3MtcGx1Z2lucwoKIyBHZW5lcmF0ZWQgQ29uZmlnIGZpbGVzCkFwcC9BcHAvY2FwYWNpdG9yLmNvbmZpZy5qc29uCkFwcC9BcHAvY29uZmlnLnhtbAo=' | base64 -d > ios/.gitignore
+          fi
+          # Remove only the ambiguous flat Contents.json copies at the root
+          # (now superseded by the correct files written above). Harmless
+          # no-op when they do not exist.
+          rm -f Contents.json 'Contents (1).json' 'Contents (2).json'
+          # Report what the tree now looks like, for the build log.
+          echo '--- reconstructed tree (key files) ---'
+          ls src src/lib ios/App/App ios/App/App.xcodeproj ios/App/App.xcworkspace/xcshareddata ios/App 2>&1 || true
+      - name: Install dependencies
+        script: |
+          npm ci
+      - name: Build web bundle and sync iOS project
+        script: |
+          npm run build
+          npx cap sync ios
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios/App && pod install
+      - name: Check StoreKit bridge is in Xcode target (WARNING only)
+        script: |
+          test -f ios/App/App/AllinViewStoreKit.swift
+          if grep -q "AllinViewStoreKit.swift" ios/App/App.xcodeproj/project.pbxproj; then
+            echo "StoreKit bridge IS referenced in project.pbxproj."
+          else
+            echo "WARNING: AllinViewStoreKit.swift is on disk but NOT referenced in project.pbxproj."
+            echo "WARNING: This build may succeed, but StoreKit purchases will NOT work until the file is added to the App target in Xcode."
+            echo "WARNING: Treat this TestFlight build as a build-path test only, NOT a purchase-ready build."
+          fi
+      - name: Set up code signing settings on Xcode project
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Verify native layers are present (no upload yet)
+        script: |
+          test -f ios/App/App/AllinViewStoreKit.swift
+          test -d ios/App/App.xcworkspace
+          grep -q "com.allinview.app" capacitor.config.ts
+          grep -q "11.99" src/lib/storekit.ts
+          ! grep -Eq "11[.]88" src/lib/storekit.ts src/App.tsx || (echo "FORBIDDEN PRICE FOUND" && exit 1)
+      - name: Build IPA for distribution
+        script: |
+          xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
+    artifacts:
+      - dist/**/*
+      - build/ios/ipa/*.ipa
+      - ios/App/App/AllinViewStoreKit.swift
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        submit_to_app_store: false

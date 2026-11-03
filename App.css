@@ -1,0 +1,33 @@
+:root { color: #0c2b33; background: #faf6f0; font-family: system-ui, -apple-system, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+.app { max-width: 720px; margin: 0 auto; padding: 16px; }
+h1 { margin: 0; font-size: 32px; }
+.tagline { margin: 4px 0 16px; color: #555; }
+.card, .summary { background: #fff; border: 1px solid #e5ddd0; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.section-head { width: 100%; display: flex; justify-content: space-between; background: none; border: 0; font-size: 17px; font-weight: 700; color: #0c2b33; cursor: pointer; padding: 2px 0; }
+.section-body { margin-top: 10px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0; }
+.grid3 > div { display: flex; flex-direction: column; gap: 2px; }
+.grid3 span, .ef span, .total-saved span { font-size: 12px; color: #666; }
+.grid3 strong, .ef strong, .total-saved strong { font-size: 17px; }
+.red strong { color: #b42318; }
+.green strong { color: #067647; }
+.oval { border: 2px solid #067647; border-radius: 24px; padding: 6px 8px; }
+.ef, .total-saved { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0; }
+.ef progress, .goal progress { width: 100%; }
+.total-saved { border-top: 1px solid #eee; padding-top: 10px; }
+.save-btn { width: 100%; padding: 14px; font-size: 17px; font-weight: 700; background: #0c2b33; color: #faf6f0; border: 0; border-radius: 10px; cursor: pointer; }
+.manual-note, .hint, .saved-note { font-size: 13px; color: #666; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.row input { flex: 1 1 120px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+.check { display: flex; align-items: center; gap: 4px; font-size: 13px; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+button { padding: 9px 12px; border-radius: 8px; border: 1px solid #0c2b33; background: #fff; color: #0c2b33; cursor: pointer; }
+button:disabled { opacity: 0.5; cursor: default; }
+.linklike { background: none; border: 0; padding: 0; font-weight: 700; text-align: left; }
+.notice { background: #fff8e1; border: 1px solid #e5c07b; padding: 10px; border-radius: 8px; }
+.celebration { background: #e6f4ea; border: 1px solid #34a853; padding: 10px; border-radius: 8px; margin: 10px 0; }
+.goal { margin-bottom: 10px; }
+label textarea, label input { display: block; width: 100%; margin: 4px 0 10px; padding: 8px; border: 1px solid #ccc; border-radius: 8px; }
+@media (max-width: 560px) { .grid3 { grid-template-columns: 1fr 1fr; } }

@@ -1,0 +1,30 @@
+# AllinView standalone rebuild — never commit secrets, keys, or build output.
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# iOS generated / local
+ios/Pods/
+ios/App/build/
+ios/App/output/
+ios/App/App/public/
+DerivedData/
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Secrets and credentials — NEVER commit these
+.env
+.env.*
+*.p8
+AuthKey_*.p8
+*.key
+*.pem
+*secret*
+*credential*
+*.mobileprovision
+*.cer
+
+# OS / editor
+.DS_Store
+Thumbs.db

@@ -3,8 +3,8 @@ import type { AppState } from './lib/types';
 import { BLANK_STATE, EXAMPLE_STATE, uid } from './lib/types';
 import { loadSaved, save, eraseSaved, exportJson, importJson, blank } from './lib/store';
 import { monthsToDebtFree, debtFreeDate, money } from './lib/payoff';
-import { PREMIUM_PRICES, FREE_TRIAL, purchase, restorePurchases } from './lib/storekit';
-import { requestReminder, storageGet, storageSet } from './lib/native';
+import { PREMIUM_PRICES, FREE_TRIAL, purchase, restorePurchases, getEntitlement } from './lib/storekit';
+import { requestReminder, storageGet, storageSet, isNative } from './lib/native';
 import './App.css';
 
 type SectionKey = 'income' | 'essentials' | 'savings' | 'debts' | 'split' | 'premium' | 'data' | 'help' | 'feedback';
@@ -25,8 +25,74 @@ export default function App() {
   // Fresh installs start BLANK. The example draft is opt-in only (demo/preview use).
   // Saved entries load asynchronously: Capacitor Preferences on iOS, localStorage on the web.
   const [draft, setDraft] = useState<AppState>(() => blank());
+  // WHOLE-APP PAYWALL LOCK (Clare, Nov 3, 2026): Premium IS the whole app.
+  // No free basic tier, no free use after one month. Every user gets a free
+  // first month, then must pay $0.99/month or $11.99/year to keep using
+  // AllinView. On the native iOS app only, the app checks the StoreKit
+  // entitlement on launch: an active entitlement — including a subscription
+  // still in its free trial, which StoreKit reports as a current entitlement —
+  // unlocks the app; anything else shows ONLY the lock screen below, never
+  // the budget/debt/savings app. A failed StoreKit check never unlocks the
+  // app on iOS; it stays locked with a retry button. On the web build there
+  // is no StoreKit, so the gate is 'web' and the app renders exactly as
+  // before (Premium section notice only) — the web build is never locked out.
+  type GateState = 'checking' | 'locked' | 'unlocked' | 'web';
+  const [gate, setGate] = useState<GateState>(isNative ? 'checking' : 'web');
+  const [gateBusy, setGateBusy] = useState(false);
+  useEffect(() => {
+    if (!isNative) return;
+    let cancelled = false;
+    void getEntitlement().then((e) => {
+      if (!cancelled) setGate(e.active ? 'unlocked' : 'locked');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const recheckGate = async () => {
+    setGateBusy(true);
+    try {
+      const e = await getEntitlement();
+      setGate(e.active ? 'unlocked' : 'locked');
+      if (!e.active) setNotice('No active membership found. Start your free month below, or tap “Restore purchases” if you already subscribed.');
+    } finally {
+      setGateBusy(false);
+    }
+  };
+  const handleGatePurchase = async (plan: 'monthly' | 'yearly') => {
+    setGateBusy(true);
+    try {
+      const r = await purchase(plan);
+      if (r.ok && r.entitlement?.active) {
+        setGate('unlocked');
+        setNotice(r.reason);
+      } else {
+        setNotice(r.reason);
+      }
+    } finally {
+      setGateBusy(false);
+    }
+  };
+  const handleGateRestore = async () => {
+    setGateBusy(true);
+    try {
+      const r = await restorePurchases();
+      if (r.ok && r.entitlement?.active) {
+        setGate('unlocked');
+        setNotice(r.reason);
+      } else {
+        setNotice(r.reason);
+      }
+    } finally {
+      setGateBusy(false);
+    }
+  };
+
   const [saved, setSaved] = useState<AppState | null>(null);
   useEffect(() => {
+    // Saved entries load only once the app is unlocked (or on the web build),
+    // so no user data is loaded behind the lock screen on iOS.
+    if (isNative && gate !== 'unlocked') return;
     let cancelled = false;
     void loadSaved().then((s) => {
       if (!cancelled && s) {
@@ -37,7 +103,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [gate]);
   const [collapsed, setCollapsed] = useState<Partial<Record<SectionKey, boolean>>>({
     debts: false,
     split: true,
@@ -218,6 +284,47 @@ export default function App() {
       d[sectionName].push({ id: uid(), label: '', amount: 0 });
       return d;
     });
+
+  // Lock screen: rendered INSTEAD of the app, never behind or beside it.
+  // On the web build gate is 'web' and this branch never runs.
+  if (isNative && gate === 'checking') {
+    return (
+      <main className="app">
+        <header>
+          <h1>AllinView</h1>
+          <p className="tagline">See what&apos;s left to spend.</p>
+        </header>
+        <p role="status">Checking your membership…</p>
+      </main>
+    );
+  }
+  if (isNative && gate === 'locked') {
+    return (
+      <main className="app">
+        <header>
+          <h1>AllinView</h1>
+          <p className="tagline">See what&apos;s left to spend.</p>
+        </header>
+        <section className="card" aria-label="AllinView membership">
+          <h2>AllinView membership</h2>
+          <p>
+            AllinView is a membership app. Your first month is free for everyone.
+            After that, membership is {PREMIUM_PRICES.monthly}, or {PREMIUM_PRICES.yearly},
+            to keep using AllinView. Nothing is free after the first month.
+          </p>
+          <p>Tap a plan to start your free month. You can cancel anytime in your App Store account settings.</p>
+          <div className="actions">
+            <button disabled={gateBusy} onClick={() => void handleGatePurchase('monthly')}>Monthly — $0.99, first month free</button>
+            <button disabled={gateBusy} onClick={() => void handleGatePurchase('yearly')}>Yearly — $11.99, first month free</button>
+            <button disabled={gateBusy} onClick={() => void handleGateRestore()}>Restore purchases</button>
+            <button disabled={gateBusy} onClick={() => void recheckGate()}>Check again</button>
+          </div>
+          <p className="hint">Membership is billed through the App Store. Subscriptions renew automatically unless cancelled in your App Store account settings. If you already subscribed on another device, tap “Restore purchases”.</p>
+          {notice && <p className="notice" role="status">{notice}</p>}
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="app">

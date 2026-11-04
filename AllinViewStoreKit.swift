@@ -1,13 +1,22 @@
 // AllinViewStoreKit — StoreKit 2 bridge for AllinView.
 //
-// STATUS: UNTESTED ON A REAL DEVICE. This file was written on a Linux VM and has
+// STATUS: STILL UNTESTED ON A REAL DEVICE. This file was written on a Linux VM and has
 // NOT been compiled with Xcode, NOT run on a Mac, and NOT tested on a real iPhone
-// or in TestFlight. The Mac build step must:
-//   1. Confirm this file is a member of the App target in the Xcode project.
-//   2. Enable the In-App Purchase capability on App ID com.allinview.app.
+// or in TestFlight. Wiring done Nov 3, 2026 (scripts/wire-storekit.py):
+//   1. DONE (locally): file added to the App target in project.pbxproj, and
+//      registered in capacitor.config.json packageClassList by
+//      scripts/register-storekit-plugin.py (run AFTER every `npx cap sync ios`,
+//      which otherwise wipes it — see that script).
+//   2. STILL TO DO (separate step, Apple Developer portal): enable the In-App
+//      Purchase capability on App ID com.allinview.app, then REGENERATE the
+//      App Store provisioning profile and re-fetch it in Codemagic — a profile
+//      made before the capability was enabled will NOT include it.
 //   3. Build with Xcode 26 / iOS 26 SDK (Apple rule since 28 Apr 2026).
-//   4. Test purchase + restore + entitlement in TestFlight with a sandbox tester
-//      before any submission. Do NOT submit with this bridge untested.
+//   4. Test purchase + restore + entitlement on a real device / TestFlight
+//      with a sandbox tester before any App Store submission. Do NOT submit
+//      with this bridge untested.
+// Also fixed Nov 3: @available(iOS 15.0, *) (StoreKit 2 needs iOS 15+), and
+// nil entitlements now resolve as NSNull instead of an Optional wrapped in Any.
 //
 // Products (must match App Store Connect exactly):
 //   com.allinview.app.monthly — $0.99/month, first month free (introductory offer)
@@ -28,6 +37,7 @@ import Foundation
 import Capacitor
 import StoreKit
 
+@available(iOS 15.0, *)
 @objc(AllinViewStoreKit)
 public class AllinViewStoreKit: CAPPlugin, CAPBridgedPlugin {
     public let identifier = "AllinViewStoreKit"
@@ -80,7 +90,7 @@ public class AllinViewStoreKit: CAPPlugin, CAPBridgedPlugin {
             do {
                 try await AppStore.sync()
                 let entitlement = await self.currentEntitlement()
-                call.resolve(["entitled": entitlement != nil, "productId": entitlement as Any])
+                call.resolve(["entitled": entitlement != nil, "productId": entitlement ?? NSNull()])
             } catch {
                 call.reject("StoreKit restore failed", nil, error)
             }
@@ -90,7 +100,7 @@ public class AllinViewStoreKit: CAPPlugin, CAPBridgedPlugin {
     @objc func getEntitlement(_ call: CAPPluginCall) {
         Task {
             let entitlement = await self.currentEntitlement()
-            call.resolve(["entitled": entitlement != nil, "productId": entitlement as Any])
+            call.resolve(["entitled": entitlement != nil, "productId": entitlement ?? NSNull()])
         }
     }
 

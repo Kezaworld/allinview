@@ -66,7 +66,7 @@ function plugin(): StoreKitPlugin | null {
 const NOT_ON_WEB: { ok: false; reason: string } = {
   ok: false,
   reason:
-    'StoreKit 2 is ready for the native build but is not available on the web — charges nothing. It has NOT been tested on a real device yet.',
+    'StoreKit is not available on the web — charges nothing. Premium works in the iOS app.',
 };
 
 function planOf(productId: string | null): PremiumPlan | null {

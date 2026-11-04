@@ -378,7 +378,7 @@ export default function App() {
             <button onClick={async () => { const r = await purchase('yearly'); setNotice(r.reason); }}>Yearly — $11.99</button>
             <button onClick={async () => { const r = await restorePurchases(); setNotice(r.reason); }}>Restore purchases</button>
           </div>
-          <p className="hint">Premium uses StoreKit 2 in the native build (products com.allinview.app.monthly / .yearly). It has NOT been tested on a real device yet; on the web it charges nothing.</p>
+          <p className="hint">Premium is billed through the App Store. Subscriptions renew automatically unless cancelled in your App Store account settings.</p>
         </>
       ))}
 
@@ -407,6 +407,7 @@ export default function App() {
           <li>Debts are listed smallest-first. Mark a debt “Paid off” when it is gone.</li>
           <li>“Every month” items roll forward when you tap “Roll over to next month”.</li>
           <li>Export downloads a file you can keep or move to another device. Import reads that file back.</li>
+          <li>Privacy policy: <a href="https://muse.ai/s/allinview-privacy-policy-xtxk6rtqxjskixb/IJk8Ew4-JV4BE9K7JGCJoQPgB6fzKlFbAVQIqMFaoeI">AllinView Privacy Policy</a>. Terms of use: <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/">Apple Standard EULA</a>.</li>
         </ul>
       ))}
 

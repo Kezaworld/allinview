@@ -1,5 +1,6 @@
-# AllinView — SIGNED Codemagic config v4 (WHOLE-APP PAYWALL LOCK — NOT uploaded, NOT run).
-# Prepared Nov 3, 2026, after the whole-app paywall lock (see below). Build 3.
+# AllinView — SIGNED Codemagic config v5 (LAYOUT FIX — NOT uploaded, NOT run).
+# Prepared Nov 10, 2026, for build 4 (layout fix so the app fits narrow iPhone
+# screens — Abra's TestFlight video showed the right side cut off). Build 4.
 # DO NOT RUN THIS WORKFLOW UNTIL ALL THREE PRECONDITIONS ARE MET, IN ORDER:
 #   1. IAP CAPABILITY: enable In-App Purchase for App ID com.allinview.app in
 #      Apple Developer portal > Identifiers. (Portal step — separate, not in yaml.)
@@ -9,17 +10,18 @@
 #      Team > Code signing identities, confirming the matching-certificate
 #      green checkmark. If you run v3 with the old profile, the build may
 #      succeed but StoreKit purchases can fail.
-#   3. UPLOAD: push the purchase-fixed project to GitHub (wired project.pbxproj,
-#      approved 1024x1024 icon, updated src/, scripts/) and upload THIS file as
+#   3. UPLOAD: push the layout-fixed project to GitHub (fixed src/App.css,
+#      build 4 in project.pbxproj, updated src/) and upload THIS file as
 #      codemagic.yaml, then run ONLY ios-signed-appstore, branch main, free
 #      tier only, no pay-as-you-go.
-# WHAT CHANGED vs v3 (v3 = signed build that succeeded Nov 3, build 1.0 (2)):
-#   - Whole-app paywall lock in src/App.tsx: on native iOS only, the app
-#     checks the StoreKit entitlement on launch and shows ONLY the lock
-#     screen (first month free for everyone, then $0.99/mo or $11.99/yr,
-#     Monthly/Yearly/Restore buttons) until an active entitlement is
-#     confirmed. Web build behaviour unchanged (never locked out).
-#   - CURRENT_PROJECT_VERSION 2 -> 3 (build 1.0 (2) is already in App Store
+# WHAT CHANGED vs v4 (v4 = signed build that succeeded Nov 3, build 1.0 (3)):
+#   - Layout fix in src/App.css (Abra, Nov 10): stop iOS text inflation
+#     (-webkit-text-size-adjust: 100%), cap the page at the screen width
+#     (overflow-x: hidden), and let the summary grid tracks and inputs shrink
+#     below their content width (minmax(0, 1fr) / min-width: 0) so nothing
+#     runs off the right edge on narrow iPhones. No price, paywall, or
+#     feature changes.
+#   - CURRENT_PROJECT_VERSION 3 -> 4 (build 1.0 (3) is already in App Store
 #     Connect; MARKETING_VERSION stays 1.0).
 # WHAT CHANGED vs v2 (v2 = signed build that succeeded Nov 3, build 1.0 (1)):
 #   - AllinViewStoreKit.swift is now IN the App target (project.pbxproj) AND
@@ -257,7 +259,7 @@ workflows:
           test -f ios/App/App/AllinViewStoreKit.swift || (echo "ERROR: AllinViewStoreKit.swift missing from ios/App/App/" && exit 1)
           grep -q "AllinViewStoreKit.swift in Sources" ios/App/App.xcodeproj/project.pbxproj || (echo "ERROR: AllinViewStoreKit.swift is NOT in the Xcode project Sources phase — the paywall would not work. Fix project.pbxproj (scripts/wire-storekit.py) and re-upload before running." && exit 1)
           grep -q "AllinViewStoreKit" ios/App/App/capacitor.config.json || (echo "ERROR: AllinViewStoreKit is NOT in capacitor.config.json packageClassList — JavaScript cannot reach the Swift bridge. The register step above must have failed." && exit 1)
-          grep -q "CURRENT_PROJECT_VERSION = 3;" ios/App/App.xcodeproj/project.pbxproj || (echo "ERROR: build number is not 3 — build 1.0 (2) is already in App Store Connect, so this upload would be rejected as a duplicate." && exit 1)
+          grep -q "CURRENT_PROJECT_VERSION = 4;" ios/App/App.xcodeproj/project.pbxproj || (echo "ERROR: build number is not 4 — build 1.0 (3) is already in App Store Connect, so this upload would be rejected as a duplicate." && exit 1)
           grep -q "SWIFT_VERSION = 5.9;" ios/App/App.xcodeproj/project.pbxproj || (echo "ERROR: SWIFT_VERSION is not 5.9 — StoreKit 2 async/await will not compile under Swift 5.0." && exit 1)
           grep -q "AllinView membership" src/App.tsx || (echo "ERROR: whole-app paywall lock screen is missing from src/App.tsx — build 3 must gate the app behind an active entitlement." && exit 1)
           # App icon must be Clare's approved 1024x1024 icon (sips is macOS-only, this runs on a Mac).
